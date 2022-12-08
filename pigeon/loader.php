@@ -442,7 +442,63 @@ if (isset($_GET['s']) && is_string($_GET['s'])) {
 				}
 			}
 			break;
-	}
+		    case "xxgg":
+			if (isset($_GET['id'], $_POST['content']) && is_string($_GET['id']) && is_string($_POST['content'])) {
+				
+				$apiUser = false;
+				if (!isset($_SESSION['user'])) {
+					if (isset($_GET['token']) && preg_match("/^[A-Za-z0-9]{32}$/", $_GET['token'])) {
+						$token = mysqli_real_escape_string($pigeon->conn, $_GET['token']);
+						$rs = mysqli_fetch_array(mysqli_query($pigeon->conn, "SELECT * FROM `users` WHERE `token`='{$token}'"));
+						if ($rs) {
+							$_SESSION['user']  = $rs['username'];
+							$_SESSION['email'] = $rs['email'];
+							$apiUser = true;
+						} else {
+							$pigeon->Exception("Permission denied");
+						}
+					} else {
+						$pigeon->Exception("请先登录。");
+					}
+				}
+				if (!$apiUser) {
+					if (!isset($_GET['seid']) || $_GET['seid'] !== $_SESSION['seid']) {
+						$pigeon->Exception("CSRF 验证失败，请尝试重新登录。");
+					}
+				}
+				if (!$pigeon->isAdmin($_SESSION['user'])) {
+					$pigeon->Exception("请求被拒绝。");
+				}
+				
+			
+				
+                $content = mysqli_real_escape_string($pigeon->conn, $_POST['content']);
+				$logUser = mysqli_real_escape_string($pigeon->conn, $_SESSION['user']);
+				$textLen = mb_strlen($content);
+			
+				if ($textLen < 1 || $textLen > 1000000) {
+					$pigeon->Exception("最少输入 1 个字符，最大输入 100 万个字符，当前已输入：{$textLen}。");
+				}
+               	$id = mysqli_real_escape_string($pigeon->conn, $_GET['id']);
+				$rs = mysqli_fetch_array(mysqli_query($pigeon->conn, "SELECT * FROM `posts` WHERE `id`='{$id}'"));
+				if ($rs) {
+					if ($rs['author'] !== $_SESSION['user'] && !$pigeon->isAdmin($_SESSION['user'])) {
+						$pigeon->Exception("未找到指定的消息内容，该消息已被删除或者您暂时没有权限查看。");
+					}
+					$content = mysqli_real_escape_string($pigeon->conn, $_POST['content']);
+				
+					$textLen = mb_strlen($content);
+					if ($textLen < 1 || $textLen > 1000000) {
+						$pigeon->Exception("最少输入 1 个字符，最大输入 100 万个字符，当前已输入：{$textLen}。");
+					}
+					mysqli_query($pigeon->conn, "UPDATE `posts` SET `content`='{$content}' WHERE `id`='{$id}'");
+					echo "Successful";
+				} else {
+					$pigeon->Exception("未找到指定的消息内容，该消息已被删除或者您暂时没有权限查看。");
+				}
+			}
+			break;
+	} 	
 } else {
 	// 默认首页
 	$pigeon->before = null;
